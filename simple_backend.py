@@ -99,7 +99,9 @@ class SimpleBackend(BaseHTTPRequestHandler):
             self.send_error(404, "Not found")
 
 if __name__ == "__main__":
-    server = HTTPServer(('127.0.0.1', 8000), SimpleBackend)
-    print("✅ Simple backend running on http://127.0.0.1:8000")
+    import os
+    port = int(os.environ.get('PORT', 8000))
+    server = HTTPServer(('0.0.0.0', port), SimpleBackend)
+    print(f"✅ Backend running on port {port}")
     print("✅ Ready for real API calls from frontend!")
     server.serve_forever()
