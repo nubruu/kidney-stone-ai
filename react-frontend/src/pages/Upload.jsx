@@ -41,7 +41,7 @@ const Upload = () => {
       const formData = new FormData()
       formData.append('file', uploadedImage.file)
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/predict`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://kidney-stone-ai-455b.up.railway.app'}/predict`, {
         method: 'POST',
         body: formData
       })
