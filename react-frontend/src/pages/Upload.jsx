@@ -1,0 +1,342 @@
+import React, { useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
+import { useDropzone } from 'react-dropzone'
+import { Upload as UploadIcon, Image, Download, Eye, AlertTriangle, CheckCircle } from 'lucide-react'
+
+const Upload = () => {
+  const [uploadedImage, setUploadedImage] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [result, setResult] = useState(null)
+
+
+  const onDrop = useCallback((acceptedFiles) => {
+    const file = acceptedFiles[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        setUploadedImage({
+          file,
+          preview: reader.result,
+          name: file.name,
+          size: file.size
+        })
+      }
+      reader.readAsDataURL(file)
+    }
+  }, [])
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/*': ['.png', '.jpg', '.jpeg']
+    },
+    maxFiles: 1
+  })
+
+  const analyzeImage = async () => {
+    setAnalyzing(true)
+    
+    try {
+      // Send image to backend for real AI prediction
+      const formData = new FormData()
+      formData.append('file', uploadedImage.file)
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/predict`, {
+        method: 'POST',
+        body: formData
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        setResult(result)
+      } else {
+        alert('Analysis failed. Please ensure backend is running.')
+      }
+    } catch (error) {
+      alert('Connection failed. Please start the backend server.')
+    }
+    
+    setAnalyzing(false)
+  }
+
+  const downloadReport = () => {
+    // Simple HTML report with embedded images
+    const htmlReport = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Kidney Stone Detection Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+          .header { text-align: center; border-bottom: 2px solid #1E88E5; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo { color: #1E88E5; font-size: 24px; font-weight: bold; }
+          .report-info { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          .results { background: ${result.prediction === 'Stone' ? '#ffebee' : '#e8f5e8'}; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          .image-section { text-align: center; margin: 30px 0; }
+          .image-section img { max-width: 500px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+          .confidence-bar { background: #e0e0e0; height: 20px; border-radius: 10px; margin: 10px 0; }
+          .confidence-fill { height: 100%; background: ${result.prediction === 'Stone' ? '#E53935' : '#43A047'}; border-radius: 10px; width: ${result.confidence}%; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">KidneyAI Pro</div>
+          <h1>Kidney Stone Detection Report</h1>
+        </div>
+        
+        <div class="report-info">
+          <h3>Report Information</h3>
+          <p><strong>Patient Image:</strong> ${uploadedImage.name}</p>
+          <p><strong>File Size:</strong> ${(uploadedImage.size / 1024 / 1024).toFixed(2)} MB</p>
+          <p><strong>Analysis Date:</strong> ${new Date().toLocaleDateString()}</p>
+          <p><strong>Analysis Time:</strong> ${new Date().toLocaleTimeString()}</p>
+          <p><strong>Report ID:</strong> KAP-${Date.now()}</p>
+        </div>
+        
+        <div class="results">
+          <h3>Analysis Results</h3>
+          <p><strong>Prediction:</strong> ${result.prediction === 'Stone' ? 'KIDNEY STONE DETECTED' : 'NO KIDNEY STONE DETECTED'}</p>
+          <p><strong>Confidence Score:</strong> ${result.confidence}%</p>
+          <div class="confidence-bar">
+            <div class="confidence-fill"></div>
+          </div>
+          <p><strong>Interpretation:</strong> ${result.prediction === 'Stone' 
+            ? 'The AI system has detected features consistent with kidney stones. Recommend immediate medical consultation for proper diagnosis and treatment planning.'
+            : 'The AI system has not detected features consistent with kidney stones. Continue regular health monitoring as recommended by your healthcare provider.'}</p>
+        </div>
+        
+        <div class="image-section">
+          <h3>Medical Image Analysis</h3>
+          <img src="${uploadedImage.preview}" alt="Medical Image" />
+          <p>Kidney scan image analyzed by AI system</p>
+        </div>
+        
+        <div class="footer">
+          <p><strong>Medical Disclaimer:</strong> This AI analysis is for educational and research purposes only. Always consult qualified medical professionals for proper diagnosis and treatment.</p>
+          <p><strong>Generated by:</strong> KidneyAI Pro v1.0</p>
+        </div>
+      </body>
+      </html>
+    `
+    
+    // Create and download HTML report
+    const blob = new Blob([htmlReport], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `kidney-stone-report-${Date.now()}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const CircularProgress = ({ percentage }) => {
+    const circumference = 2 * Math.PI * 45
+    const strokeDasharray = circumference
+    const strokeDashoffset = circumference - (percentage / 100) * circumference
+
+    return (
+      <div className="relative w-32 h-32">
+        <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+          <circle
+            cx="50"
+            cy="50"
+            r="45"
+            stroke="currentColor"
+            strokeWidth="8"
+            fill="transparent"
+            className="text-gray-200 dark:text-gray-700"
+          />
+          <circle
+            cx="50"
+            cy="50"
+            r="45"
+            stroke="currentColor"
+            strokeWidth="8"
+            fill="transparent"
+            strokeDasharray={strokeDasharray}
+            strokeDashoffset={strokeDashoffset}
+            className={`transition-all duration-1000 ${result?.prediction === 'Stone' ? 'text-danger' : 'text-secondary'}`}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-2xl font-bold text-text-primary dark:text-white">
+            {percentage}%
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center"
+      >
+        <h1 className="text-3xl font-bold text-text-primary dark:text-white mb-2">
+          Medical Image Analysis
+        </h1>
+        <p className="text-text-secondary dark:text-gray-400">
+          Upload kidney ultrasound or CT scan for AI-powered stone detection
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Upload Section */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="card"
+        >
+          <h2 className="text-xl font-bold text-text-primary dark:text-white mb-4 flex items-center gap-2">
+            <UploadIcon size={24} />
+            Upload Medical Image
+          </h2>
+
+          {!uploadedImage ? (
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
+                isDragActive 
+                  ? 'border-primary bg-primary/5' 
+                  : 'border-border-color hover:border-primary hover:bg-primary/5'
+              }`}
+            >
+              <input {...getInputProps()} />
+              <div className="space-y-4">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                  <Image size={32} className="text-primary" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-text-primary dark:text-white">
+                    {isDragActive ? 'Drop image here' : 'Drag & drop image here'}
+                  </p>
+                  <p className="text-text-secondary dark:text-gray-400">
+                    or click to browse files
+                  </p>
+                </div>
+                <p className="text-sm text-text-secondary dark:text-gray-400">
+                  Supports PNG, JPG, JPEG (Max 10MB)
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="relative">
+                <img
+                  src={uploadedImage.preview}
+                  alt="Uploaded scan"
+                  className="w-full h-64 object-cover rounded-xl"
+                />
+                <button
+                  onClick={() => setUploadedImage(null)}
+                  className="absolute top-2 right-2 bg-danger text-white p-2 rounded-full hover:bg-red-600 transition-colors"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                <div>
+                  <p className="font-medium text-text-primary dark:text-white">
+                    {uploadedImage.name}
+                  </p>
+                  <p className="text-sm text-text-secondary dark:text-gray-400">
+                    {(uploadedImage.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+                <button
+                  onClick={analyzeImage}
+                  disabled={analyzing}
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {analyzing ? 'Analyzing...' : 'Analyze Image'}
+                </button>
+              </div>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Results Section */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="card"
+        >
+          <h2 className="text-xl font-bold text-text-primary dark:text-white mb-4">
+            Analysis Results
+          </h2>
+
+          {analyzing ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-text-secondary dark:text-gray-400">
+                AI is analyzing your medical image...
+              </p>
+            </div>
+          ) : result ? (
+            <div className="space-y-6">
+              <div className={`p-6 rounded-xl text-center ${
+                result.prediction === 'Stone' 
+                  ? 'bg-danger/10 border border-danger/20' 
+                  : 'bg-secondary/10 border border-secondary/20'
+              }`}>
+                <div className="flex items-center justify-center mb-4">
+                  {result.prediction === 'Stone' ? (
+                    <AlertTriangle size={48} className="text-danger" />
+                  ) : (
+                    <CheckCircle size={48} className="text-secondary" />
+                  )}
+                </div>
+                <h3 className={`text-2xl font-bold mb-2 ${
+                  result.prediction === 'Stone' ? 'text-danger' : 'text-secondary'
+                }`}>
+                  {result.prediction === 'Stone' ? 'Kidney Stone Detected' : 'No Kidney Stone Detected'}
+                </h3>
+                <p className="text-text-secondary dark:text-gray-400">
+                  {result.prediction === 'Stone' 
+                    ? 'Recommend immediate medical consultation' 
+                    : 'Normal kidney structure detected'
+                  }
+                </p>
+              </div>
+
+              <div className="text-center">
+                <h4 className="text-lg font-semibold text-text-primary dark:text-white mb-4">
+                  Confidence Score
+                </h4>
+                <CircularProgress percentage={result.confidence} />
+              </div>
+
+              <div className="flex justify-center">
+                <button 
+                  onClick={downloadReport}
+                  className="btn-primary flex items-center justify-center gap-2 px-8"
+                >
+                  <Download size={20} />
+                  Download Report
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <UploadIcon size={32} className="text-text-secondary dark:text-gray-400" />
+              </div>
+              <p className="text-text-secondary dark:text-gray-400">
+                Upload an image to see analysis results
+              </p>
+            </div>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+export default Upload
